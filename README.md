@@ -34,6 +34,12 @@ Jia, Q., Tang, J., Ye, L., & Wang, H.
 | `matching_framework.py` | Core event-driven online matching framework implementing the proposed method and three baseline strategies |
 | `generate_datasets.py` | Synthetic dataset generation for four stress-test families (Scale, Scarcity, Backlog, Conflict) |
 
+### Prompt Design
+
+| File | Description |
+|------|-------------|
+| `prompt_design.txt` | Two-stage temperature-decoupled system prompt for LLM virtual sampling (physical anchoring + Monte Carlo divergence) |
+
 ### Statistical Validation Figures
 
 | File | Description |
