@@ -222,40 +222,35 @@ def _gen_conflict_text(text, ctype):
 
 def generate_conflict(df_d, ratio):
     """
-    Stratified random selection: 3 risk levels x 3 POI types = 9 strata.
+    Stratified random selection within each POI type (healthcare, community,
+    individual), preserving the original distribution (~1:2:5).
     Within each stratum, ceil(ratio * n) demanders are randomly selected.
-    Conflict types A/B/C are assigned in round-robin order.
+    Conflict types A/B/C are assigned at a 2:1:1 ratio, reflecting the
+    empirical predominance of quantitative exaggeration in the dataset.
     Only the text column (text_i) is modified; cloud parameters are untouched.
     """
     rng = np.random.default_rng(SEED)
     df_out = df_d.copy()
 
-    # Build strata
-    risk_bins = [0, 40, 70, 100]
-    risk_labels = ['Low', 'Med', 'High']
-    df_out['risk_lvl'] = pd.cut(df_out['Ex_r,i'], bins=risk_bins,
-                                labels=risk_labels, right=False)
-
     poi_map = {1: 'Medical', 2: 'Community', 3: 'Individual'}
     df_out['poi'] = df_out['unit_i'].map(poi_map)
-    df_out['stratum'] = df_out['risk_lvl'].astype(str) + '_' + df_out['poi']
 
-    conflict_types = ['A_QuantExag', 'B_LogicContra', 'C_FalseInfo']
+    # A:B:C = 2:1:1, mapped as round-robin over a weighted pool
+    conflict_pool = ['A_QuantExag'] * 2 + ['B_LogicContra'] + ['C_FalseInfo']
 
-    for stratum in df_out['stratum'].unique():
-        s_idx = df_out[df_out['stratum'] == stratum].index.tolist()
+    for poi in ['Medical', 'Community', 'Individual']:
+        s_idx = df_out[df_out['poi'] == poi].index.tolist()
         n_sel = max(1, int(np.ceil(len(s_idx) * ratio)))
         selected = sorted(rng.choice(s_idx, size=min(n_sel, len(s_idx)),
                                      replace=False))
 
         for k, row_idx in enumerate(selected):
-            ctype = conflict_types[k % 3]
+            ctype = conflict_pool[k % len(conflict_pool)]
             df_out.at[row_idx, 'text_i'] = _gen_conflict_text(
                 df_out.at[row_idx, 'text_i'], ctype
             )
 
-    # Remove helper columns
-    df_out = df_out.drop(columns=['risk_lvl', 'poi', 'stratum'])
+    df_out = df_out.drop(columns=['poi'])
     return df_out
 
 
@@ -288,12 +283,13 @@ if __name__ == '__main__':
         print(f'Backlog {int(ratio*100)}%: {int(len(df_d)*ratio)} demanders '
               f'delayed')
 
-    # --- Semantic Conflict (text-level only) ---
+    # --- Semantic Conflict (text-level injection, A:B:C = 2:1:1) ---
     for ratio in [0.15, 0.30, 0.50]:
         dd = generate_conflict(df_d, ratio)
         dd.to_csv(os.path.join(BASE, f'demand_Conflict{int(ratio*100)}.csv'),
                   index=False)
         n_mod = int(np.ceil(len(df_d) * ratio))
-        print(f'Conflict {int(ratio*100)}%: ~{n_mod} demander texts modified')
+        print(f'Conflict {int(ratio*100)}%: ~{n_mod} demander texts replaced '
+              f'(POI-stratified, A:B:C = 2:1:1)')
 
     print('\nDone.')
